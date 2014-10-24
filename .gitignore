@@ -1,0 +1,13 @@
+.classpath
+.project
+*.class
+build.xml
+.settings/org.eclipse.jdt.core.prefs
+nbproject/project.xml
+nbproject/project.properties
+manifest.mf
+nbproject/private/private.xml
+nbproject/private/private.properties
+nbproject/genfiles.properties
+nbproject/build-impl.xml
+src/test/**
