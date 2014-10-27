@@ -16,22 +16,20 @@ import org.push.protocol.OutgoingPacket;
 
 public abstract class BroadcastManagerBase {
 
+	/* To store the broadcast queue by name */
     private Map<String, BroadcastQueue> channelMap = 
     	new HashMap<String, BroadcastQueue>();
 
+    /* To store the names of the broadcast queue */
     private List<String> globalQueues = new LinkedList<String>();;
     
     public BroadcastManagerBase() {
     }
 
     /**
-     * Create a new channel by the provided information
-     * 
-     * @param channelKey
-     * @param maxPacket
-     * @param requireSubscription
-     * @param priority
-     * @param packetQuota
+     * Create a new <code>BroadcastQueue</code> by the provided information
+     * @param channelKey   Name of broadcast queue
+     * @param queueOptions Options for creating broadcast queue
      */
     public void createBroadcastQueue(String channelKey, 
     		QueueOptions queueOptions) {
@@ -44,6 +42,10 @@ public abstract class BroadcastManagerBase {
     	}
     }
 
+    /**
+     * Remove a broadcast queue by the given name
+     * @param channelKey  Name of the broadcast queue
+     */
     public void removeBroadcastQueue(String channelKey) {
     	channelMap.remove(channelKey);
     }
@@ -135,6 +137,11 @@ public abstract class BroadcastManagerBase {
     	return sb.toString();
     }
 
+    /**
+     * Get a <code>BroadcastQueue</code> by the given name
+     * @param channelKey  The name of broadcast queue
+     * @return  The <code>BroadcastQueue</code>
+     */
     public BroadcastQueue getQueue(String channelKey) {
 		return channelMap.get(channelKey);
 	}

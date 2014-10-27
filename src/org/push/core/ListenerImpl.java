@@ -6,7 +6,7 @@ import java.net.InetSocketAddress;
 import org.push.util.Debug;
 
 /**
- * Listener to listen and accept socket.
+ * Listener implementation to listen and accept socket.
  * 
  * @author Lei Wang
  */
@@ -15,12 +15,13 @@ public class ListenerImpl {
 
 	private Listener facade;
 	
-	// The socket to listen the port
+	// The server socket to listen to the port
 	private PushServerSocket serverSocket;
 
 	 // If listener is running.
 	private volatile boolean blnRunning;
 	
+	// Thread to accept the client socket
 	private Thread acceptorThread;
 
 	public ListenerImpl(Listener facade) {
@@ -64,7 +65,7 @@ public class ListenerImpl {
 			serverSocket = null;
 		}
 		
-		// wait the thread to terminate
+		// Wait the thread to terminate
 		if (acceptorThread != null) {
 			try {
 				acceptorThread.join();

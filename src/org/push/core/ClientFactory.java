@@ -42,7 +42,7 @@ public class ClientFactory {
 	/**
 	 * Lock for {@link #vectPendingPhysicalConnections}
 	 */
-	private Object csChannelMap;
+	//private Object csChannelMap;
 	private List<PhysicalConnection> vectPendingPhysicalConnections = 
 		new LinkedList<PhysicalConnection>();
 
@@ -66,10 +66,14 @@ public class ClientFactory {
 		
 	    nClientsCount = 0;
 	    cs = new Object();
-	    csChannelMap = new Object();
+	    //csChannelMap = new Object();
 		isPermitOnly = false;
 	}
 
+	/**
+	 * Add <code>LogicalConnectionImpl</code> under management
+	 * @param logicalConnection  The <code>LogicalConnectionImpl</code>
+	 */
 	public void addLogicalConnection(LogicalConnectionImpl logicalConnection) {
 		synchronized(cs) {
 		    //
@@ -83,7 +87,15 @@ public class ClientFactory {
 			logicalConnection.incrementUsage();
 		}
 	}
-	    
+	
+	/**
+	 * Remove the <code>LogicalConnectionImpl</code> from management
+	 * and disconnect it. 
+	 * @param logicalConnection      The <code>LogicalConnectionImpl</code>
+	 * @param waitForPendingPackets  If waiting when there is packet being sent
+	 * @param closeReason  The reason to close
+	 * @return  true if succeed
+	 */
 	public boolean disconnect(LogicalConnectionImpl logicalConnection, 
 			boolean waitForPendingPackets, DisconnectionReason closeReason) {
 		if (!removeIfExisting(logicalConnection)) {
@@ -93,7 +105,13 @@ public class ClientFactory {
 		disconnectIntern(logicalConnection, waitForPendingPackets, closeReason);
 		return true;
 	}
-	    
+	
+	/**
+	 * Disconnect the <code>LogicalConnectionImpl</code>
+	 * @param logicalConnection      The <code>LogicalConnectionImpl</code>
+	 * @param waitForPendingPackets  If waiting when there is packet being sent
+	 * @param closeReason  The reason to close
+	 */
 	public void disconnectIntern(LogicalConnectionImpl logicalConnection, 
 			boolean waitForPendingPackets, DisconnectionReason closeReason) {
 		// Close the physical connection first
@@ -116,17 +134,25 @@ public class ClientFactory {
 			logicalConnection.onDisconnected(closeReason);
 		}
 		
-		/* Remove from the broadcast list */
+		/* Remove from the broadcast queue */
 		logicalConnection.getStreamer().removeItem(logicalConnection);
 		
 		/* Do garbage collection */
 		garbageCollector.addDisposableClient(logicalConnection);
 	}
 
+	/**
+	 * Decrement the usage of <code>LogicalConnectionImpl</code>
+	 * @param client  The <code>LogicalConnectionImpl</code>
+	 */
 	public void returnClient(LogicalConnectionImpl client) {
 	    client.decrementUsage();
 	}
 
+	/**
+	 * Return how many clients under management.
+	 * @return  The count of clients under management
+	 */
 	public int getClientCount() { return nClientsCount; }
 	
 	/**
@@ -156,7 +182,7 @@ public class ClientFactory {
 	 */
 	public void scrutinizeChannels() {
 		ServerOptions options = serverImpl.getServerOptions();
-		synchronized(csChannelMap) {
+		synchronized(vectPendingPhysicalConnections) {
 			Iterator<PhysicalConnection> it = 
 				vectPendingPhysicalConnections.iterator();
 			
@@ -166,7 +192,7 @@ public class ClientFactory {
 	
 				if (connection.getStatus() == 
 						PhysicalConnection.Status.Connected) {
-					// Verify expiry : 
+					// Verify expiration : 
 					int nMaxDuration = connection.isObserverChannel() ? 
 							40 : options.getLoginExpireDuration();
 					if (connection.getLifeDuration() > nMaxDuration) {
@@ -184,13 +210,19 @@ public class ClientFactory {
 		}
 	}
 
-	public void addIPRangeAccess(String ipStart, String ipStop, 
+	/**
+	 * Add an IP range for permit or block
+	 * @param ipStart  The start IP of range
+	 * @param ipEnd    The end IP of range
+	 * @param bPermit  true for permit list, false for block list
+	 */
+	public void addIPRangeAccess(String ipStart, String ipEnd, 
 			boolean bPermit) {
 		isPermitOnly = bPermit;
 
 		IPRange ipRange;
 		try {
-			ipRange = new IPRange(ipStart, ipStop);
+			ipRange = new IPRange(ipStart, ipEnd);
 		} catch (InvalidIPAddressException e) {
 			e.printStackTrace();
 			return;
@@ -201,6 +233,11 @@ public class ClientFactory {
 		list.add(ipRange);
 	}
 
+	/**
+	 * Check if the IP is allowed to access the server
+	 * @param ip  The IP address of String format
+	 * @return  true if IP is allowed
+	 */
 	public boolean isAddressAllowed(String ip) {
 		if (!IPRange.isValidIP(ip)) {
 			System.err.println("Invalid IP: " + ip);
@@ -226,7 +263,6 @@ public class ClientFactory {
 	/**
 	 * Create <code>PhysicalConnection</code> for the new accepted
 	 * socket and save it under management.
-	 * 
 	 * @param socket
 	 * @param isObserver  If it is for monitor service
 	 * @param listenerOptions
@@ -242,7 +278,7 @@ public class ClientFactory {
 		// In both cases reset the object.
 		connection.reset(socket, isObserver, listenerOptions);
 
-		//
+		// Set up the protocol
 		if (!connection.setUpProtocolContexts()) {
 			thePhysicalConnectionPool.returnObject(connection);
 			return false;
@@ -251,7 +287,7 @@ public class ClientFactory {
 		Debug.debug("Physical Connection Created for client from: " + 
 				socket.getIP());
 
-	    //Now Associate with IOCP main Handle
+	    // Now Associate with I/O Queue
 	    if (!ioQueue.addSocketContext(socket, connection)) {
 			thePhysicalConnectionPool.returnObject(connection);
 	        //leave socket close to acceptor
@@ -267,20 +303,34 @@ public class ClientFactory {
 	    return true;
 	}
 
+	/**
+	 * Add the physical connection into the pending list
+	 * @param connection  The physical connection
+	 */
 	public void addPhysicalConnection(PhysicalConnection connection) {
-		synchronized(csChannelMap) {
+		synchronized(vectPendingPhysicalConnections) {
 			vectPendingPhysicalConnections.add(connection);
 		}
 	}
 
+	/**
+	 * Remove the physical connection from the pending list.
+	 * Usually, after removed the physical connection will 
+	 * be attached to a <code>LogicalConnection</code>.
+	 * @param connection  The physical connection
+	 * @return  true if removed successfully.
+	 */
 	public boolean removePhysicalConnection(PhysicalConnection connection) {
-		synchronized(csChannelMap) {
+		synchronized(vectPendingPhysicalConnections) {
 			return vectPendingPhysicalConnections.remove(connection);
 		}
 	}
 	
+	/**
+	 * Stop this service
+	 */
 	public void stop() {
-		synchronized(csChannelMap) {
+		synchronized(vectPendingPhysicalConnections) {
 			//Remove all connections (Demux is already stopped):
 			Iterator<PhysicalConnection> it = 
 				vectPendingPhysicalConnections.iterator();
@@ -292,12 +342,21 @@ public class ClientFactory {
 		}
 	}
 	
+	/**
+	 * Release the <code>PhysicalConnection</code>.
+	 * @param connection  The physical connection
+	 */
 	public void disposePhysicalConnection(PhysicalConnection connection) {
 		PhysicalConnectionPool thePhysicalConnectionPool = 
 			serverImpl.getPhysicalConnectionPool();
 		thePhysicalConnectionPool.returnObject(connection);
 	}
 
+	/**
+	 * Remove the <code>LogicalConnection</code> if it exists.
+	 * @param logicalConnection  the <code>LogicalConnection</code>
+	 * @return  true if removed successfully.
+	 */
 	private boolean removeIfExisting(LogicalConnectionImpl logicalConnection) {
 		synchronized(cs) {
 			Set<LogicalConnectionImpl> set = logicalConnection.isMonitor() ? 

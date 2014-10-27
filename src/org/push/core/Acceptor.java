@@ -27,15 +27,13 @@ public class Acceptor extends Listener {
 
 	    stats.addToCumul(ServerStats.Measures.VisitorsSYNs, 1);
 
-		if (clientFactoryImpl.getClientCount() >= 
-				options.getMaxConnections()) {
+		if (clientFactoryImpl.getClientCount() >= options.getMaxConnections()) {
 			Debug.debug("Reach maximum clients allowed, deny it");
 			return false;
 		}
 
-		//Check if IP is not blocked :
-		if (!clientFactoryImpl.isAddressAllowed(
-				clientSocket.getIP())) {
+		//Check if IP is allowed :
+		if (!clientFactoryImpl.isAddressAllowed(clientSocket.getIP())) {
 			Debug.debug("IP refused: " + clientSocket.getIP());
 			return false;
 		}

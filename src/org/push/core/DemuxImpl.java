@@ -53,15 +53,7 @@ public class DemuxImpl {
 	    for (int i = 0; i < nThreads; i ++) {
 	    	thread = new Thread(new Runnable() {
 				public void run() {
-					threadProcForReadEvents(me);
-				}
-	    	});
-	    	thread.start();
-	        workersThreadsVect.add(thread);
-
-	    	thread = new Thread(new Runnable() {
-				public void run() {
-					threadProcForWriteEvents(me);
+					me.proc();
 				}
 	    	});
 	    	thread.start();
@@ -82,14 +74,6 @@ public class DemuxImpl {
 		    }
 	    }
 	}
-
-	private static void threadProcForReadEvents(DemuxImpl me) {
-	    me.proc();
-	}
-
-	private static void threadProcForWriteEvents(DemuxImpl me) {
-	    me.proc(false);
-	}
 	
 	private void proc() {
 		proc(true);
@@ -106,13 +90,7 @@ public class DemuxImpl {
 	        if (ioEvent != null) {		        
 		        PhysicalConnection perSocketContext = ioEvent.context();
 
-	            //
-	            if (ioEvent.type() == IOEventType.write) { // OUT Event
-	        		Debug.debug("Out Event for: " + 
-	        				perSocketContext.getPeerIP());
-	                dispatcher.handleWrite(perSocketContext, -1);
-	            }
-	            else if (ioEvent.type() == IOEventType.read) { // IN event
+	            if (ioEvent.type() == IOEventType.read) { // IN event
 	        		Debug.debug("In Event for: " + 
 	        				perSocketContext.getPeerIP());
 	                dispatcher.handleRead(perSocketContext, -1);

@@ -15,6 +15,10 @@ import org.push.core.IOEvent.IOEventType;
 
 /**
  * A implementation by Java NIO to manage socket I/O event.
+ * In Java, the write event is something different, and it
+ * will be triggered all the times when the socket buffer
+ * is available so it will occupy the CPU all the times, so
+ * write event will not monitored.
  * 
  * @author Lei Wang
  */
@@ -22,15 +26,12 @@ import org.push.core.IOEvent.IOEventType;
 public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 
 	private Selector inPollSelector;
-	private Selector outPollSelector;
 	
 	private Thread inPollThread;
-	private Thread outPollThread;
 	
 	private volatile boolean isPolling;
 	
 	private BlockingQueue<SelectionKey> inPollQueue;
-	private BlockingQueue<SelectionKey> outPollQueue;
 	
 	private ConcurrentMap<PushClientSocket, SelectionKeyGroup> socketMap
 		= new ConcurrentHashMap<PushClientSocket, SelectionKeyGroup>();
@@ -70,16 +71,7 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 			return false;
 		}
 		
-		try {
-			outPollSelector = Selector.open();
-		} catch (IOException e) {
-			e.printStackTrace();
-			closeSelector(inPollSelector);
-			return false;
-		}
-		
 		inPollQueue = new LinkedBlockingQueue<SelectionKey>(pollsize);
-		outPollQueue = new LinkedBlockingQueue<SelectionKey>(pollsize);
 		
 		isPolling = true;
 		final IOQueueImpl me = this;
@@ -88,15 +80,7 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 				me.pollEvents(false);
 			}
 		});
-
-		outPollThread = new Thread(new Runnable() {
-			public void run() {
-				me.pollEvents(true);
-			}
-		});
-
 		inPollThread.start();
-		outPollThread.start();
 		
 		return true;
 	}
@@ -106,23 +90,13 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 
 		closeSelector(inPollSelector);
 		inPollSelector = null;
-
-		closeSelector(outPollSelector);
-		outPollSelector = null;
 		
 		// Clear the event queue first
 		// will awake the thread if it blocks because the queue is full.
 		inPollQueue.clear();
-		outPollQueue.clear();
 
 		try {
 			inPollThread.join();
-		} catch (InterruptedException e) {
-			// Ignore
-		}
-
-		try {
-			outPollThread.join();
 		} catch (InterruptedException e) {
 			// Ignore
 		}
@@ -139,8 +113,8 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 			type = IOEventType.read;
 			pollQueue = inPollQueue;
 		} else {
-			type = IOEventType.write;
-			pollQueue = outPollQueue;
+			type = null;
+			pollQueue = null;
 		}
 		
 		if (pollQueue == null) {
@@ -201,11 +175,10 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 	}
 	
 	private void pollEvents(boolean isOutPoll) {
-		final Selector selector;
-		final BlockingQueue<SelectionKey> queue;
+		Selector selector;
+		BlockingQueue<SelectionKey> queue;
 		if (isOutPoll) {
-			selector = this.outPollSelector;
-			queue = this.outPollQueue;
+			return;
 		} else {
 			selector = this.inPollSelector;
 			queue = this.inPollQueue;
@@ -248,21 +221,6 @@ public class IOQueueImpl implements IOQueue<PhysicalConnection> {
 
 	public boolean rearmSocketForWrite(PushClientSocket socket,
 			PhysicalConnection context) {
-		SelectionKey writeKey = null;
-		try {
-			writeKey = socket.registerSelector(outPollSelector, 
-					SelectionKey.OP_WRITE, context);
-		} catch (IOException e) {
-			e.printStackTrace();
-			return false;
-		}
-		
-		SelectionKeyGroup keyGroup = socketMap.get(socket);
-		if (keyGroup != null) {
-			keyGroup.writeKey = writeKey;
-			return true;
-		}
-
 		return false;
 	}
 

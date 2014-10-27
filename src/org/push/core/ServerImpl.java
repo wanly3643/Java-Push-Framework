@@ -78,40 +78,61 @@ public class ServerImpl {
 	    initComponent();
 	}
 
+	/**
+	 * This method will start a loop. During the loop, once in a
+	 * while, some clearing work and sampling of performance will
+	 * be done. It will end the loop until the server is stopped.
+	 * @see {@link #stop()}
+	 */
 	private void eternalLoop() {
 	     facade.onStarted();
 	     long deadline = System.currentTimeMillis();
 	     while (true) {
 	    	 deadline = System.currentTimeMillis() + 1000;
 	    	 LockSupport.parkUntil(deadline);
-	    	 
-	    	 // timeout
-	    	 if (isRunning && System.currentTimeMillis() >= deadline) {
+
+	    	 if (isRunning) {
 	    		 doPeriodicJobs();
 	    	 } else {
 	    		 break;
 	    	 }
 	     }
 	}
+	
+	/**
+	 * Every once in a while, this method will be called to 
+	 * do some clearing work and sample the performance data.
+	 */
 	private void doPeriodicJobs() {
 	    nSecsGCCount += 1;
 	    nSecsPerfObservCount += 1;
 
+	    /* Garbage collection */
 	    if(nSecsGCCount == uGCPeriod) {
 	        nSecsGCCount=0;
+	        
+	        // Invoke the garbage collector
 	        garbageCollector.activate();
+	        
+	        // Clear the inactive connections
 	        clientFactoryImpl.scrutinize();
 	    }
 
-	    // Reach the sampling point, save the data of server status
+	    /* Reaching the sampling point, save the server status */
 	    if(nSecsPerfObservCount == options.getSamplingRate() && 
 	    		options.isProfilingEnabled()) {
 	        nSecsPerfObservCount=0;
+	        
+	        // Send the packet with the performance information
 	        OutgoingPacket packet = stats.getPerformancePacket();
 	        monitorBroadcastManager.pushPacket(packet, "stats");
 	    }
 	}
 	
+	/**
+	 * Start all the listeners of the server
+	 * @return  true if started successfully
+	 */
 	private boolean startListening() {
 		for (Acceptor acceptor : listenersMap.values()) {
 			if (!acceptor.startListening()) {
@@ -122,6 +143,10 @@ public class ServerImpl {
 		return true;
 	}
 
+	
+	/**
+	 * Stop all the listeners of the server
+	 */
 	private void stopListening() {
 		for (Acceptor acceptor : listenersMap.values()) {
 			acceptor.stopListening();
@@ -146,6 +171,7 @@ public class ServerImpl {
 
 		return nMaxSize;
 	}
+
 	private int calculateAdditionalBuffersForProtocols(
 			int nMaxPoolConnections, int nMaxThreads) {
 		Utils.unsignedIntArgCheck(nMaxPoolConnections, "nMaxPoolConnections");
@@ -290,7 +316,13 @@ public class ServerImpl {
 		return theConnectionContextPool;
 	}
 
-	public boolean createListener(int port, ListenerOptions pOptions) {
+	/**
+	 * Create a listener by the options to listen the port.
+	 * @param port    The port to listen
+	 * @param options The options to create the listener
+	 * @return  True if the listener is created successfully.
+	 */
+	public boolean createListener(int port, ListenerOptions options) {
 		Integer key = new Integer(port);
 		if (listenersMap.containsKey(key)) {
 			return false;
@@ -298,7 +330,7 @@ public class ServerImpl {
 
 		Acceptor acceptor = new Acceptor(this);
 		acceptor.setListeningPort(port);
-		acceptor.setOptions(pOptions);
+		acceptor.setOptions(options);
 
 		listenersMap.put(key, acceptor);
 	    return true;
@@ -308,9 +340,7 @@ public class ServerImpl {
 	    dispatcher.registerService(service);
 	}
 
-	public String getServerInfos() {
-	    return this.serverInfos;
-	}
+	public String getServerInfos() { return this.serverInfos; }
 
 	public void setServerInfos(String serverInfos) {
 	    this.serverInfos = serverInfos;
@@ -351,7 +381,7 @@ public class ServerImpl {
 	    }
 		Debug.debug("Listener Started");
 
-		/* Start the listener to monitor service if required */
+		/* Start the listener of monitor service if required */
 	    if (options.isMonitorEnabled()) {
 			monitorAcceptor.setListeningPort(options.getMonitorPort());
 			if (!monitorAcceptor.startListening()) {
@@ -392,6 +422,8 @@ public class ServerImpl {
 
 	public void stop() {
 		isRunning = false;
+		
+		/* End the loop */
 		if (hThread != null) {
 			LockSupport.unpark(hThread);
 
@@ -402,32 +434,46 @@ public class ServerImpl {
 			}
 		}
 
+		/* Stop the listener and streamer of monitor service */
 	    if (options.isMonitorEnabled()) {
 	        monitorAcceptor.stopListening();
 			monitorsStreamer.stop();
 			monitorsStreamer = null;
 		}
 
+	    // Stop the listeners
 	    stopListening();
 
+	    // Stop the multiplexor
 	    demux.stop();
 
+	    // Stop the client factory manager
 	    clientFactoryImpl.stop();
 
+	    // Stop the broadcast streamers
 		stopStreamers();
 
+		// Dispose all the packets to broadcast
 	    broadcastManager.disposeAllPackets();
 		monitorBroadcastManager.disposeAllPackets();
 
+		// Release the I/O queue
 	    ioQueue.free();
 
+	    // Invoke the garbage collector
 	    garbageCollector.activate(true);
 	}
 
+	/**
+	 * Pause and stop the listeners to common client
+	 */
 	public void pause(){
 		stopListening();
 	}
 
+	/**
+	 * Resume and restart the listeners to common client
+	 */
 	public void resume(){
 		startListening();
 	}
@@ -438,6 +484,9 @@ public class ServerImpl {
 
 	public MessageFactory getMessageFactory() { return msgFactory; }
 
+	/**
+	 * Start all the streamers of common client.
+	 */
 	public void startStreamers() {
 		BroadcastStreamer streamer;
 		for (int i = 0; i < options.getStreamers(); i++) {
@@ -447,6 +496,9 @@ public class ServerImpl {
 		}
 	}
 
+	/**
+	 * Stop all the streamers of common client.
+	 */
 	public void stopStreamers() {
 		Iterator<BroadcastStreamer> it = streamersList.iterator();
 		BroadcastStreamer streamer;
@@ -457,6 +509,10 @@ public class ServerImpl {
 		}
 	}
 
+	/**
+	 * Tell all the streamers to send all the broadcasting packets
+	 * to the clients.
+	 */
 	public void reshuffleStreamers() {
 		Iterator<BroadcastStreamer> it = streamersList.iterator();
 		BroadcastStreamer streamer;
@@ -465,11 +521,23 @@ public class ServerImpl {
 			streamer.awakeAll();
 		}
 	}
-	
+
+
+	/**
+	 * Tell all the streamer of monitor service to send all 
+	 * the packets to the clients.
+	 */
 	public void reshuffleMonitorsStreamer() {
 		monitorsStreamer.awakeAll();
 	}
 
+	/**
+	 * Add a client into the streamer and this client will be subscribed
+	 * into all the broadcast queues if it is not a monitor client. And
+	 * if this is a monitor client, it will added into the monitor streamer
+	 * and will be subscribed into the broadcast queue of monitor service.
+	 * @param logicalConnection  The client
+	 */
 	public void addClientToStreamers(
 			LogicalConnectionImpl logicalConnection) {
 		BroadcastManagerBase broadcastManagerRef = logicalConnection.isMonitor() 
@@ -485,6 +553,9 @@ public class ServerImpl {
 			return;
 		}
 
+		/* Find a streamer with least connections and register
+		 * the connection to this streamer
+		 */
 		BroadcastStreamer lessBusy = null;
 
 		for (BroadcastStreamer streamer : streamersList) {
@@ -503,28 +574,66 @@ public class ServerImpl {
 		}
 	}
 
+	/**
+	 * Create a broadcast queue with given name and options.
+	 * The name must be unique.
+	 * @param queueName    The name of the queue
+	 * @param queueOptions The options for creating this queue
+	 */
 	public void createQueue(String queueName, QueueOptions queueOptions) {
 		broadcastManager.createBroadcastQueue(queueName, queueOptions);
 	}
 
+	/**
+	 * Remove the broadcast queue by the given name.
+	 * @param queueName The name of the queue
+	 */
 	public void removeQueue(String queueName) {
 		broadcastManager.removeBroadcastQueue(queueName);
 	}
 
-	public boolean pushPacket(OutgoingPacket pPacket, String queueName) {
-		return broadcastManager.pushPacket(pPacket, queueName, "", 0);
+	/**
+	 * @see {@link #pushPacket(OutgoingPacket, String, String, int)}
+	 * @param packet    The packet to send
+	 * @param queueName The name of broadcast queue
+	 * @return  true if the packet is added into queue successfully
+	 */
+	public boolean pushPacket(OutgoingPacket packet, String queueName) {
+		return broadcastManager.pushPacket(packet, queueName, "", 0);
 	}
 
-	public boolean pushPacket(OutgoingPacket pPacket, String queueName, 
+	/**
+	 * Broadcast a packet to the connections within the broadcast queue
+	 * with the given name.
+	 * The packet is only added into the queue and return at once. So
+	 * it will not wait until the packet is sent.
+	 * @param packet    The packet to send
+	 * @param queueName The name of broadcast queue
+	 * @param killKey   The key will be used when remove the packet
+	 * @param objectCategory  The category of this packet. It will 
+	 *                        be used to remove the packet.
+	 * @return true if the packet is added into queue successfully
+	 */
+	public boolean pushPacket(OutgoingPacket packet, String queueName, 
 			String killKey, int objectCategory) {
-		return broadcastManager.pushPacket(pPacket, queueName, killKey, 
+		return broadcastManager.pushPacket(packet, queueName, killKey, 
 				objectCategory);
 	}
 
+	/**
+	 * Remove the packet from the broadcast queue.
+	 * @param killKey        The unique of the packet
+	 * @param objectCategory The category of the packet
+	 * @param queueName      The name of the broadcast queue
+	 */
 	public void removePacketFromQueue(String killKey, int objectCategory, 
 			String queueName) {
 		broadcastManager.removePacket(killKey, objectCategory, queueName);
 	}
 
+	/**
+	 * Return the facade of this server implementation.
+	 * @return  The facade attached
+	 */
 	public Server getFacade() { return facade; }
 }
