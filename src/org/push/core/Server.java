@@ -159,7 +159,8 @@ public abstract class Server {
 	}
 
 	/**
-	 * Handle the request of monitor service and return the output
+	 * This is extension for remote control. You could add some command
+	 * processing here.
 	 * @param command  the command within the request of monitor service
 	 * @return the output
 	 */

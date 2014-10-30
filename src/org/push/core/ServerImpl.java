@@ -186,18 +186,21 @@ public class ServerImpl {
 		return nTotal;
 	}
 
-	private boolean initializeProtocolContextPools(int nMaxPoolConnections) {
+	private boolean initializeProtocolContextPools(int nInitPoolConnections, 
+			int nMaxPoolConnections) {
 		Utils.unsignedIntArgCheck(nMaxPoolConnections, "nMaxPoolConnections");
 
 		for (Acceptor acceptor : listenersMap.values()) {
-			if (!acceptor.getProtocol().initialize(nMaxPoolConnections))
+			if (!acceptor.getProtocol().initialize(nInitPoolConnections, 
+					nMaxPoolConnections))
 				return false;
 		}
 
 		return true;
 	}
 	
-	private boolean initializeBufferPool(int nMaxPoolConnections) {
+	private boolean initializeBufferPool(int nInitPoolConnections, 
+			int nMaxPoolConnections) {
 		int nMaxThreads = options.getWorkersCount() + 20;
 		//
 		int nMessageSize = calculateMaxBufferSizePerMessage();
@@ -229,21 +232,26 @@ public class ServerImpl {
 		return true;
 	}
 	
-	private boolean initConnectionPool(int nMaxPoolConnections) {
-		if (!thePhysicalConnectionPool.initialize(nMaxPoolConnections)) {
+	private boolean initConnectionPool(int nInitPoolConnections, 
+			int nMaxPoolConnections) {
+		if (!thePhysicalConnectionPool.initialize(nInitPoolConnections, 
+				nMaxPoolConnections)) {
 			return false;
 		}
 
-		if (!theLogicalConnectionPool.initialize(nMaxPoolConnections)) {
+		if (!theLogicalConnectionPool.initialize(nInitPoolConnections, 
+				nMaxPoolConnections)) {
 			return false;
 		}
 		if (options.challengeClients() && 
-				!theConnectionContextPool.initialize(nMaxPoolConnections)) {
+				!theConnectionContextPool.initialize(nInitPoolConnections, 
+						nMaxPoolConnections)) {
 				return false;
 		}
 		Debug.debug("Connection Context Created");
 
-		if(!initializeProtocolContextPools(nMaxPoolConnections)) {
+		if(!initializeProtocolContextPools(nInitPoolConnections, 
+				nMaxPoolConnections)) {
 			return false;
 		}
 
@@ -348,14 +356,15 @@ public class ServerImpl {
 
 	public boolean start(boolean startInSeparateThread) {
 		int nMaxPoolConnections = options.getMaxConnections() + 10;
+		int nInitPoolConnections = options.getInitConnections();
 		
-		if (!initializeBufferPool(nMaxPoolConnections)) {
+		if (!initializeBufferPool(nInitPoolConnections, nMaxPoolConnections)) {
 			return false;
 		}
 		Debug.debug("Buffer Pool Created");
 		
 		/* Initialize the pool of connection */
-		if (!initConnectionPool(nMaxPoolConnections)) {
+		if (!initConnectionPool(nInitPoolConnections, nMaxPoolConnections)) {
 			return false;
 		}
 		Debug.debug("Connection Pool Created");

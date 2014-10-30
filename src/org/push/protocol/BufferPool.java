@@ -49,7 +49,7 @@ public class BufferPool implements Releasable {
 
 		SegmentPool segPool = new SegmentPool(nSize);
 
-		if (!segPool.initialize(nCount)) {
+		if (!segPool.initialize(nCount, nCount)) {
 			return false;
         }
 

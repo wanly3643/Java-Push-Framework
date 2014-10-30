@@ -14,6 +14,11 @@ public class ServerOptions {
 	 * Max connection allowed by this server
 	 */
     private int nMaxConnections;
+	
+	/**
+	 * Initial connection allowed by this server
+	 */
+    private int nInitConnections;
     
     /**
      * The timeout (seconds) of expiration
@@ -81,6 +86,7 @@ public class ServerOptions {
 
 	public ServerOptions() {
 		nMaxConnections = 100;
+		nInitConnections = 20;
 		challengeClients = false;
 		uLoginExpireDuration = 35;
 		nWorkersCount = Runtime.getRuntime().availableProcessors() * 2;
@@ -97,6 +103,8 @@ public class ServerOptions {
 	}
 	
 	public int getMaxConnections() { return this.nMaxConnections; }
+	
+	public int getInitConnections() { return this.nInitConnections; }
 	
 	public int getLoginExpireDuration() { return this.uLoginExpireDuration; }
 	
@@ -130,6 +138,12 @@ public class ServerOptions {
 		Utils.unsignedIntArgCheck(nMaxConnections, "nMaxConnections");
 		
 		this.nMaxConnections = nMaxConnections;
+	}
+	
+	public void setInitConnections(int nInitConnections) {
+		Utils.unsignedIntArgCheck(nInitConnections, "nInitConnections");
+		
+		this.nInitConnections = nInitConnections;
 	}
 	
 	public void setLoginExpireDuration(int uLoginExpireDuration) {

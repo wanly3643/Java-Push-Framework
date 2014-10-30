@@ -338,13 +338,13 @@ public class TCPSocketImpl extends Connection {
 			return false;
 
 		if(!BufferPool.getDefaultPool().create(RecyclableBuffer.Type.Double, 
-				10, nSize*2))
+				10, nSize * 2))
 			return false;
 
 		oBuffer.allocate(nSize * 5);
 
 
-		pProtocol.initialize(1);
+		pProtocol.initialize(1, 1);
 
 		this.setUpProtocolContexts();
 

@@ -3,7 +3,10 @@ package org.push.protocol;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.push.util.Releasable;
+import org.push.util.Utils;
 
 /**
  * This class provides a skeletal implementation of an object pool.
@@ -21,6 +24,12 @@ public abstract class AbstractPool<T> implements Releasable {
     
     // The objects which are still free in the pool
     private ConcurrentLinkedQueue<T> freeObjects;
+    
+    /* Maximum objects allowed in the pool */
+    private int maxAllowed;
+    
+    /* How many objects in the pool */
+    private AtomicInteger objectCount;
 
     public AbstractPool() {
         objectsInUse = new ConcurrentHashMap<T, Object>();
@@ -30,15 +39,35 @@ public abstract class AbstractPool<T> implements Releasable {
     public void release() {
         objectsInUse.clear();
         freeObjects.clear();
+        maxAllowed = 0;
+        objectCount = null;
     }
 
     /**
      * Initialize the pool to create some objects within the pool.
      * 
      * @param nRequiredObjects  How many objects are created
+     * @param maxAllowed        Maximum objects are allowed
      * @return  true if the initialization is finished without error.
      */
-    public boolean initialize(int nRequiredObjects) {
+    public synchronized boolean initialize(int nRequiredObjects, 
+    		int maxAllowed) {
+    	// Already initialized
+    	if (objectCount != null || maxAllowed != 0) {
+    		return false;
+    	}
+
+    	Utils.unsignedIntArgCheck(nRequiredObjects, "nRequiredObjects");
+    	Utils.unsignedIntArgCheck(maxAllowed, "maxAllowed");
+    	
+    	if (maxAllowed < nRequiredObjects) {
+    		throw new IllegalArgumentException(
+    				"'maxAllowed' could not be less than 'nRequiredObjects'");
+    	}
+    	
+    	this.objectCount = new AtomicInteger(nRequiredObjects);
+    	this.maxAllowed = maxAllowed;
+
         try {
             for (int i = 0; i < nRequiredObjects; i ++) {
                 freeObjects.add(createImpl());
@@ -60,9 +89,18 @@ public abstract class AbstractPool<T> implements Releasable {
     public T borrowObject() {
 		T object = freeObjects.poll();
 
-		if (object != null) {
-            objectsInUse.put(object, OBJECT);
+		if (object == null) {
+			if (objectCount.getAndIncrement() < maxAllowed) {
+				object = createImpl();
+			} else {
+				objectCount.decrementAndGet(); //recover
+			}
         }
+		
+		// Add into in use list if there is an available
+		if (object != null) {
+			objectsInUse.put(object, OBJECT);
+		}
 
 		return object;
     }
