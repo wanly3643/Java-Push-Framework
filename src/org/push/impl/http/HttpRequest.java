@@ -13,7 +13,7 @@ public class HttpRequest implements IncomingPacket {
 	
 	private Map<String, String> headers = new HashMap<String, String>();
 	
-	private byte[] entity;
+	private HttpEntity entity;
 	
 	HttpRequest() {
 		;
@@ -37,7 +37,7 @@ public class HttpRequest implements IncomingPacket {
 		this.headers = headers;
 	}
 	
-	public byte[] getEntity() { return this.entity; }
+	public HttpEntity getEntity() { return this.entity; }
 	
-	public void setEntity(byte[] entity) { this.entity = entity; }
+	public void setEntity(HttpEntity entity) { this.entity = entity; }
 }

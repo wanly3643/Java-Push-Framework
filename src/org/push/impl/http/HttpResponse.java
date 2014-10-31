@@ -12,7 +12,7 @@ public class HttpResponse implements OutgoingPacket {
 	
 	private Map<String, String> headers = new HashMap<String, String>();
 	
-	private byte[] entity;
+	private HttpEntity entity;
 	
 	HttpResponse() { }
 
@@ -30,7 +30,7 @@ public class HttpResponse implements OutgoingPacket {
 		this.headers = headers;
 	}
 	
-	public byte[] getEntity() { return this.entity; }
+	public HttpEntity getEntity() { return this.entity; }
 	
-	public void setEntity(byte[] entity) { this.entity = entity; }
+	public void setEntity(HttpEntity entity) { this.entity = entity; }
 }

@@ -56,7 +56,7 @@ public class HttpMessageFactory extends MessageFactory {
 		}
 		
 		// Entity
-		byte[] entity = httpResp.getEntity();
+		byte[] entity = httpResp.getEntity().getBytes();
 		if (entity != null && !buffer.append(entity)) {
 			return SerializeResult.InsufficientBufferSpace;
 		}
@@ -139,7 +139,10 @@ public class HttpMessageFactory extends MessageFactory {
 		httpReq.setUrl(url);
 		httpReq.setVersion(version);
 		httpReq.setHeaders(headers);
-		httpReq.setEntity(entity);
+		
+		HttpEntity entityObject = new HttpEntity();
+		entityObject.setBytes(entity);
+		httpReq.setEntity(entityObject);
 		
 		deserializeData.setMessage(httpReq);
 		
