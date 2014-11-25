@@ -142,7 +142,7 @@ public class ProtocolManager {
 				} else {
 					tmpOutputBuffer.release();
 					return NetworkDeserializeResult.WantMoreData;
-				}				
+				}
 			} else if (decodeResult == DecodeResult.NoContent) {
 				continue;
 			} else if (decodeResult == DecodeResult.ProtocolBytes) {
